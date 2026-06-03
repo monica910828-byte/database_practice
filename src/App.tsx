@@ -2,8 +2,8 @@ import React, { useState, useRef } from 'react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './firebase';
-import EmotionSelector, { Emotion } from './components/EmotionSelector';
-import DrawingCanvas, { DrawingCanvasHandle } from './components/DrawingCanvas';
+import EmotionSelector, { type Emotion } from './components/EmotionSelector';
+import DrawingCanvas, { type DrawingCanvasHandle } from './components/DrawingCanvas';
 
 function App() {
   const [name, setName] = useState('');

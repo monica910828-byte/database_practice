@@ -6,7 +6,7 @@ export interface DrawingCanvasHandle {
   isEmpty: () => boolean;
 }
 
-const DrawingCanvas = forwardRef<DrawingCanvasHandle>((props, ref) => {
+const DrawingCanvas = forwardRef<DrawingCanvasHandle>((_, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasDrawn, setHasDrawn] = useState(false);
