@@ -1,122 +1,119 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import React, { useState, useRef } from 'react';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { db, storage } from './firebase';
+import EmotionSelector, { Emotion } from './components/EmotionSelector';
+import DrawingCanvas, { DrawingCanvasHandle } from './components/DrawingCanvas';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [name, setName] = useState('');
+  const [emotion, setEmotion] = useState<Emotion | null>(null);
+  const canvasRef = useRef<DrawingCanvasHandle>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error' | 'loading', text: string } | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!name.trim()) {
+      setMessage({ type: 'error', text: '이름을 입력해주세요!' });
+      return;
+    }
+    if (!emotion) {
+      setMessage({ type: 'error', text: '기분을 선택해주세요!' });
+      return;
+    }
+    if (!canvasRef.current || canvasRef.current.isEmpty()) {
+      setMessage({ type: 'error', text: '마음속 기분을 그려주세요!' });
+      return;
+    }
+
+    const imageData = canvasRef.current.getImageData();
+    if (!imageData) {
+      setMessage({ type: 'error', text: '그림을 가져오는데 실패했습니다.' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage({ type: 'loading', text: '소중한 마음을 저장하는 중이에요...' });
+
+    try {
+      // 1. Upload Image to Storage
+      const filename = `emotions/${Date.now()}_${name}.jpg`;
+      const storageRef = ref(storage, filename);
+      await uploadString(storageRef, imageData, 'data_url');
+      const imageUrl = await getDownloadURL(storageRef);
+
+      // 2. Save data to Firestore
+      await addDoc(collection(db, 'emotion_logs'), {
+        studentName: name,
+        emotion: emotion,
+        imageUrl: imageUrl,
+        createdAt: serverTimestamp(),
+      });
+
+      setMessage({ type: 'success', text: '성공적으로 저장되었어요! 참 잘했어요 🌟' });
+      
+      // Reset form
+      setName('');
+      setEmotion(null);
+      canvasRef.current.clear();
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => setMessage(null), 5000);
+      
+    } catch (error) {
+      console.error("Error saving data:", error);
+      setMessage({ type: 'error', text: '저장 중 오류가 발생했어요. 선생님께 알려주세요!' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="app-container">
+      <h1>🌈 내 마음 알리미</h1>
+      
+      {message && (
+        <div className={`message ${message.type}`}>
+          {message.text}
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
+      )}
+
+      <form onSubmit={handleSubmit}>
+        <div className="card" style={{ marginBottom: '2rem' }}>
+          <div className="input-group">
+            <label htmlFor="studentName">이름이 무엇인가요?</label>
+            <input
+              type="text"
+              id="studentName"
+              placeholder="이름을 입력해주세요"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={isSubmitting}
+            />
+          </div>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
+
+        <EmotionSelector 
+          selectedEmotion={emotion} 
+          onSelect={isSubmitting ? () => {} : setEmotion} 
+        />
+        
+        <div style={{ marginTop: '2rem' }}>
+          <DrawingCanvas ref={canvasRef} />
+        </div>
+
+        <button 
+          type="submit" 
+          className="btn btn-primary"
+          disabled={isSubmitting}
         >
-          Count is {count}
+          {isSubmitting ? '저장 중...' : '제출하기'}
         </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      </form>
+    </div>
+  );
 }
 
-export default App
+export default App;
